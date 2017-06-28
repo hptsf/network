@@ -85,7 +85,7 @@ int main(int argc, char **argv)
  
         bzero(buf, BUF_MAX_LEN + 1);
         len = recv(new_fd, buf, BUF_MAX_LEN, 0);
-        if(len > 0)
+        if((int)len > 0)
             printf("Recv msg successfully[%d]\n", len);
         else 
             perror("recv failed");
