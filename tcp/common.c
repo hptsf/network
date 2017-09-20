@@ -2,6 +2,12 @@
 
 int run_flag = 0;
 
+void sig_handler(int sig)
+{
+    fprintf(stdout, "Get a signal[%d]\n", sig);
+    run_flag = 0;
+}
+
 /* sock: set object
  * to  : timeout value, second
  */

@@ -13,7 +13,7 @@ common.o: common.c common.h
 	gcc -g -c common.c
 
 $(OBJ2): tcp_srv.o common.o
-	gcc tcp_srv.o common.o -o $(OBJ2)
+	gcc tcp_srv.o common.o -o $(OBJ2) -lpthread
 
 tcp_srv.o: tcp_srv.c common.h
 	gcc -g -c tcp_srv.c

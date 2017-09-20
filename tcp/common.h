@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <signal.h>
+#include <pthread.h>
 
 #define BUF_MAX_LEN             512
 #define DEFAULT_PORT            56789
@@ -18,6 +19,7 @@
 
 extern int run_flag;
 
+void sig_handler(int sig);
 int setSockTimeout(int sock, int to);
 
 #endif
