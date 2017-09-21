@@ -37,7 +37,7 @@ static void *server_route(void *arg)
        FD_ZERO(&rd_fds);
        FD_SET(param->sock_fd, &rd_fds);
 
-       timeout.tv_sec = 2;
+       timeout.tv_sec = 5;
        timeout.tv_usec = 0;
        len = select(max_fd, &rd_fds, NULL, NULL, &timeout);
        if(-1 == len){
@@ -54,7 +54,11 @@ static void *server_route(void *arg)
         len = recv(param->sock_fd, buf, BUF_MAX_LEN, 0);
 
         if((int)len > 0){
-            printf("Get a msg: %s\n", buf);
+#if DEBUG
+            fprintf(stdout, "Get a msg: %s\n", buf);
+#else
+            fprintf(stdout, "Get a msg: %d\n", len);
+#endif
         }else if(0 == len){ 
             fprintf(stdout, "Maybe client has been disconnected\n");
             break;
