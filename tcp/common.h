@@ -9,11 +9,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include <signal.h>
 #include <pthread.h>
 
-#define BUF_MAX_LEN             512
+#define BUF_MAX_LEN             1048576
 #define DEFAULT_PORT            56789
 #define DEFAULT_QUEUE_LENGTH    3
 

@@ -24,6 +24,9 @@ static void *server_route(void *arg)
     int max_fd = 0;
     fd_set rd_fds;
     struct timeval timeout;
+    struct timeval t_end;
+    unsigned int frame_rate = 0;
+    unsigned long long last_time_sec = 0;
 
     if(NULL == arg)
         goto out;
@@ -56,8 +59,6 @@ static void *server_route(void *arg)
         if((int)len > 0){
 #if DEBUG
             fprintf(stdout, "Get a msg: %s\n", buf);
-#else
-            fprintf(stdout, "Get a msg: %d\n", len);
 #endif
         }else if(0 == len){ 
             fprintf(stdout, "Maybe client has been disconnected\n");
@@ -73,16 +74,24 @@ static void *server_route(void *arg)
             break;
         }
 
+        frame_rate ++;
         if(0 == strncmp("quit", buf, 4)){
             break;
         }
-
+#if DEBUG
         len = send(param->sock_fd, buf, strlen(buf) + 1, 0);
         if(len < 0) {
             perror("send failed");
         }
         else{ 
             printf("Send msg successfully[%d]\n", len);
+        }
+#endif
+        gettimeofday(&t_end, NULL);
+        if(t_end.tv_sec - last_time_sec > 1){
+            fprintf(stdout, "Get msg's frame rate: %d\n", frame_rate);
+            frame_rate = 0;
+            last_time_sec = t_end.tv_sec;
         }
    }while(1); 
 
