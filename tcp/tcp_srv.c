@@ -1,6 +1,6 @@
 #include "tcp_srv.h"
 
-//#define DEBUG   1
+#define DEBUG   1
 
 static pthread_t srv_pids[SERVER_THREAD_MAX];
 
@@ -93,7 +93,7 @@ static void *server_route(void *arg)
             frame_rate = 0;
             last_time_sec = t_end.tv_sec;
         }
-   }while(1); 
+   }while(run_flag); 
 
    close(param->sock_fd);
    param->sock_fd = -1;
@@ -117,6 +117,7 @@ int main(int argc, char **argv)
     int i;
     socklen_t len;
     int client_id = -1;
+    int opt = 1;
    
     if(1 == argc){
         port = DEFAULT_PORT;
@@ -144,8 +145,14 @@ int main(int argc, char **argv)
     server_addr.sin_family = PF_INET;
     server_addr.sin_port = htons(port);
     server_addr.sin_addr.s_addr = INADDR_ANY;
-   
-    ret =  bind(sockfd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
+  
+    ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if(-1 == ret){
+        perror("setsockopt fialed\n");
+        goto out;
+    }
+
+    ret = bind(sockfd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
     if (-1 == ret) {
         perror("bind failed");
         goto out;
