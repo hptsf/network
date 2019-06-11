@@ -13,6 +13,7 @@
 
 #include <signal.h>
 #include <pthread.h>
+#include <sys/epoll.h>
 
 #define BUF_MAX_LEN             1048576
 #define DEFAULT_PORT            56789

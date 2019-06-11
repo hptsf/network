@@ -2,6 +2,8 @@
 
 #define DEBUG   1
 
+#define MAXEVENTS       32
+
 static pthread_t srv_pids[SERVER_THREAD_MAX];
 
 static int get_client_id(void)
@@ -17,16 +19,56 @@ static int get_client_id(void)
     return -1;
 }
 
-static void *server_route(void *arg)
+static int do_interactive(int fd)
 {
+    unsigned int frame_rate = 0;
     char buf[BUF_MAX_LEN + 1];
     int len = -1;
-    int max_fd = 0;
-    fd_set rd_fds;
-    struct timeval timeout;
-    struct timeval t_end;
-    unsigned int frame_rate = 0;
-    unsigned long long last_time_sec = 0;
+
+    bzero(buf, BUF_MAX_LEN + 1);
+    len = recv(fd, buf, BUF_MAX_LEN, 0);
+
+    if((int)len > 0){
+#if DEBUG
+        fprintf(stdout, "Get a msg: %s\n", buf);
+#endif
+    }else if(0 == len){ 
+        fprintf(stdout, "Maybe client has been disconnected\n");
+        return -1;
+    }else{
+        if(EINTR == errno){
+            fprintf(stdout, "Get a signal\n");
+            return -2;
+        }
+#if DEBUG
+        perror("recv failed: ");
+#endif
+        return -3;
+    }
+
+    frame_rate ++;
+    if(0 == strncmp("quit", buf, 4)){
+        return 0;
+    }
+#if DEBUG
+    len = send(fd, buf, strlen(buf) + 1, 0);
+    if(len < 0) {
+        perror("send failed");
+    }
+    else{ 
+        printf("Send msg successfully[%d]\n", len);
+    }
+#endif
+
+    return 0;
+}
+
+static void *server_route(void *arg)
+{
+    int len = -1;
+    int efd = -1;
+    struct epoll_event event;
+    struct epoll_event *events;
 
     if(NULL == arg)
         goto out;
@@ -35,64 +77,49 @@ static void *server_route(void *arg)
         goto out;
 
     fprintf(stdout, "server for client[%d] is running\n", param->client_id);
-    max_fd = param->sock_fd + 1;
+
+    efd = epoll_create(1);
+    if(-1 == efd){
+        perror("epoll_create failed");
+    }
+    event.data.fd = param->sock_fd;
+    event.events = EPOLLERR | EPOLLHUP | EPOLLET | EPOLLIN | EPOLLOUT | EPOLLRDHUP;
+
+    len = epoll_ctl(efd, EPOLL_CTL_ADD, param->sock_fd, &event);
+    if(-1 == len){
+        perror("epoll_ctl");
+    }
+    events = calloc(MAXEVENTS, sizeof(event));
+
    do{
-       FD_ZERO(&rd_fds);
-       FD_SET(param->sock_fd, &rd_fds);
+       int n;
+       int i;
 
-       timeout.tv_sec = 5;
-       timeout.tv_usec = 0;
-       len = select(max_fd, &rd_fds, NULL, NULL, &timeout);
-       if(-1 == len){
-           perror("select failed: ");
-           break;
-       }else if(0 == len){
-#if DEBUG
-           fprintf(stdout, "Timeout, and try again\n");
-#endif
-           continue;
+       n = epoll_wait(efd, events, MAXEVENTS, 500);     // 500ms for timeout to handler sigint
+       for(i = 0; i < n; i ++){
+           // error or hup
+           if(events[i].events & (EPOLLERR | EPOLLHUP)){
+               fprintf(stdout, "epoll error\n");
+               close(events[i].data.fd);
+               continue;
+           }
+
+           if(events[i].events & EPOLLRDHUP){       // close or shutdown by peer
+               fprintf(stdout, "connection being closed by peer[%d]\n", run_flag);
+               break;
+           }
+
+           // epoll in: readable
+           if(events[i].events & EPOLLIN){
+               if(param->sock_fd == events[i].data.fd){
+                   do_interactive(param->sock_fd);
+               }
+           }else if(events[i].events & EPOLLOUT){   // epoll out: writable
+               if(param->sock_fd == events[i].data.fd){
+                   fprintf(stdout, "There have some data to send\n");
+               }
+           }
        }
-
-        bzero(buf, BUF_MAX_LEN + 1);
-        len = recv(param->sock_fd, buf, BUF_MAX_LEN, 0);
-
-        if((int)len > 0){
-#if DEBUG
-            fprintf(stdout, "Get a msg: %s\n", buf);
-#endif
-        }else if(0 == len){ 
-            fprintf(stdout, "Maybe client has been disconnected\n");
-            break;
-        }else{
-            if(EINTR == errno){
-                fprintf(stdout, "Get a signal\n");
-                continue;
-            }
-#if DEBUG
-            perror("recv failed: ");
-#endif
-            break;
-        }
-
-        frame_rate ++;
-        if(0 == strncmp("quit", buf, 4)){
-            break;
-        }
-#if DEBUG
-        len = send(param->sock_fd, buf, strlen(buf) + 1, 0);
-        if(len < 0) {
-            perror("send failed");
-        }
-        else{ 
-            printf("Send msg successfully[%d]\n", len);
-        }
-#endif
-        gettimeofday(&t_end, NULL);
-        if(t_end.tv_sec - last_time_sec > 1){
-            fprintf(stdout, "Get msg's frame rate: %d\n", frame_rate);
-            frame_rate = 0;
-            last_time_sec = t_end.tv_sec;
-        }
    }while(run_flag); 
 
    close(param->sock_fd);
